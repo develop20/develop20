@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recipe Log</title>
+<style>
+  :root {
+    --bg: #faf7f2; --card: #fff; --text: #2b2723; --muted: #7a7168;
+    --accent: #c2410c; --accent-soft: #fde8dc; --line: #e8e1d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a17; --card: #26231f; --text: #f1ece4; --muted: #a39a8e;
+      --accent: #fb8a4c; --accent-soft: #3a2a20; --line: #38332c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+  nav { display: flex; gap: 8px; margin-bottom: 16px; }
+  nav button {
+    flex: 1; padding: 10px; border: 1px solid var(--line); background: var(--card);
+    color: var(--text); border-radius: 10px; font: inherit; cursor: pointer;
+  }
+  nav button[aria-selected="true"] {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  }
+  .badge {
+    display: inline-block; min-width: 1.4em; padding: 0 6px; margin-left: 6px;
+    border-radius: 99px; background: var(--accent-soft); color: var(--accent);
+    font-size: .8rem; font-weight: 600;
+  }
+  [aria-selected="true"] .badge { background: #ffffff33; color: #fff; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; margin-bottom: 12px;
+  }
+  input[type=text], textarea {
+    width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--text); font: inherit;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  label:first-child { margin-top: 0; }
+  button.primary {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer; margin-top: 12px;
+  }
+  button.link {
+    background: none; border: 0; color: var(--accent); font: inherit;
+    cursor: pointer; padding: 4px 6px;
+  }
+  button.link.danger { color: var(--muted); }
+  .recipe-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .recipe-head h2 { font-size: 1.1rem; margin: 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 8px; }
+  ul.plain { list-style: none; padding: 0; margin: 8px 0 0; }
+  ul.plain li {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    border-top: 1px solid var(--line);
+  }
+  ul.plain li:first-child { border-top: 0; }
+  ul.plain li .name { flex: 1; }
+  li.done .name { text-decoration: line-through; color: var(--muted); }
+  li input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+  .add-row { display: flex; gap: 8px; }
+  .add-row button { margin-top: 0; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  .src { color: var(--muted); font-size: .8rem; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 99px;
+    font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🍳 Recipe Log</h1>
+  <nav role="tablist">
+    <button role="tab" id="tab-recipes" aria-selected="true">Recipes<span class="badge" id="n-recipes">0</span></button>
+    <button role="tab" id="tab-list" aria-selected="false">Shopping list<span class="badge" id="n-list">0</span></button>
+  </nav>
+
+  <section id="view-recipes">
+    <form class="card" id="recipe-form">
+      <label for="title">Recipe title</label>
+      <input type="text" id="title" placeholder="e.g. Spaghetti bolognese" required>
+      <label for="ingredients">Ingredients (one per line)</label>
+      <textarea id="ingredients" placeholder="500g minced beef&#10;1 onion&#10;400g tin chopped tomatoes" required></textarea>
+      <button class="primary" type="submit" id="save-btn">Save recipe</button>
+      <button class="link" type="button" id="cancel-btn" hidden>Cancel edit</button>
+    </form>
+    <div id="recipes"></div>
+  </section>
+
+  <section id="view-list" hidden>
+    <form class="card add-row" id="item-form">
+      <input type="text" id="item" placeholder="Add an item…" aria-label="Add an item">
+      <button class="primary" type="submit">Add</button>
+    </form>
+    <div class="card" id="list-card"></div>
+    <div class="actions">
+      <button class="link" id="clear-done">Clear ticked</button>
+      <button class="link danger" id="clear-all">Clear all</button>
+      <button class="link" id="copy-list">Copy list</button>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+let recipes = load('rl.recipes', []);   // {id, title, ingredients: string[]}
+let list = load('rl.list', []);         // {id, name, done, from?}
+let editingId = null;
+
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function addToList(names, from) {
+  let added = 0;
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    if (list.some(i => norm(i.name) === norm(name))) continue;
+    list.push({ id: uid(), name, done: false, from });
+    added++;
+  }
+  save('rl.list', list); render();
+  return added;
+}
+
+function render() {
+  $('n-recipes').textContent = recipes.length;
+  $('n-list').textContent = list.filter(i => !i.done).length;
+
+  $('recipes').innerHTML = recipes.length ? recipes.map(r => `
+    <article class="card" data-id="${r.id}">
+      <div class="recipe-head"><h2>${esc(r.title)}</h2></div>
+      <ul class="plain">${r.ingredients.map((ing, i) => `
+        <li><span class="name">${esc(ing)}</span>
+          <button class="link" data-act="add-one" data-i="${i}">+ list</button></li>`).join('')}
+      </ul>
+      <div class="actions">
+        <button class="link" data-act="add-all">Add all to shopping list</button>
+        <button class="link" data-act="edit">Edit</button>
+        <button class="link danger" data-act="delete">Delete</button>
+      </div>
+    </article>`).join('')
+    : '<p class="empty">No recipes yet. Add your first one above.</p>';
+
+  $('list-card').innerHTML = list.length ? `<ul class="plain">${list.map(i => `
+    <li class="${i.done ? 'done' : ''}" data-id="${i.id}">
+      <input type="checkbox" ${i.done ? 'checked' : ''} aria-label="Got ${esc(i.name)}">
+      <span class="name">${esc(i.name)}${i.from ? ` <span class="src">· ${esc(i.from)}</span>` : ''}</span>
+      <button class="link danger" data-act="remove" aria-label="Remove">✕</button>
+    </li>`).join('')}</ul>`
+    : '<p class="empty">Your shopping list is empty.</p>';
+}
+
+// Tabs
+function show(tab) {
+  $('view-recipes').hidden = tab !== 'recipes';
+  $('view-list').hidden = tab !== 'list';
+  $('tab-recipes').setAttribute('aria-selected', tab === 'recipes');
+  $('tab-list').setAttribute('aria-selected', tab === 'list');
+}
+$('tab-recipes').onclick = () => show('recipes');
+$('tab-list').onclick = () => show('list');
+
+// Recipe form
+function resetForm() {
+  editingId = null; $('recipe-form').reset();
+  $('save-btn').textContent = 'Save recipe'; $('cancel-btn').hidden = true;
+}
+$('cancel-btn').onclick = resetForm;
+$('recipe-form').onsubmit = e => {
+  e.preventDefault();
+  const title = $('title').value.trim();
+  const ingredients = $('ingredients').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!title || !ingredients.length) return;
+  if (editingId) {
+    const r = recipes.find(r => r.id === editingId);
+    Object.assign(r, { title, ingredients });
+  } else {
+    recipes.unshift({ id: uid(), title, ingredients });
+  }
+  save('rl.recipes', recipes); resetForm(); render(); toast('Recipe saved');
+};
+
+$('recipes').onclick = e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const r = recipes.find(r => r.id === btn.closest('article').dataset.id); if (!r) return;
+  const act = btn.dataset.act;
+  if (act === 'add-all') {
+    const n = addToList(r.ingredients, r.title);
+    toast(n ? `Added ${n} item${n > 1 ? 's' : ''}` : 'Already on your list');
+  } else if (act === 'add-one') {
+    const n = addToList([r.ingredients[+btn.dataset.i]], r.title);
+    toast(n ? 'Added to list' : 'Already on your list');
+  } else if (act === 'edit') {
+    editingId = r.id; $('title').value = r.title; $('ingredients').value = r.ingredients.join('\n');
+    $('save-btn').textContent = 'Update recipe'; $('cancel-btn').hidden = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' }); $('title').focus();
+  } else if (act === 'delete') {
+    if (confirm(`Delete "${r.title}"?`)) {
+      recipes = recipes.filter(x => x.id !== r.id); save('rl.recipes', recipes); render();
+    }
+  }
+};
+
+// Shopping list
+$('item-form').onsubmit = e => {
+  e.preventDefault();
+  const v = $('item').value; $('item').value = '';
+  if (v.trim()) addToList([v]);
+};
+$('list-card').onclick = e => {
+  const li = e.target.closest('li'); if (!li) return;
+  const item = list.find(i => i.id === li.dataset.id); if (!item) return;
+  if (e.target.matches('input[type=checkbox]')) { item.done = e.target.checked; }
+  else if (e.target.closest('[data-act=remove]')) { list = list.filter(i => i !== item); }
+  else return;
+  save('rl.list', list); render();
+};
+$('clear-done').onclick = () => { list = list.filter(i => !i.done); save('rl.list', list); render(); };
+$('clear-all').onclick = () => { if (list.length && confirm('Clear the whole list?')) { list = []; save('rl.list', list); render(); } };
+$('copy-list').onclick = async () => {
+  const text = list.filter(i => !i.done).map(i => '• ' + i.name).join('\n');
+  if (!text) return toast('Nothing to copy');
+  try { await navigator.clipboard.writeText(text); toast('List copied'); } catch { toast('Copy not available'); }
+};
+
+render();
+</script>
+</body>
+</html>
