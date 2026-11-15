@@ -7,18 +7,21 @@
   :root {
     --bg: #f6f4ef; --card: #ffffff; --fg: #26231f; --muted: #6f685f;
     --accent: #b8420f; --accent-fg: #ffffff; --accent-soft: #f9e3d6; --line: #e3ddd1;
+    --danger: #c62828; --danger-fg: #ffffff;
     --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #1b1a18; --card: #252320; --fg: #f1ece4; --muted: #a49c90;
       --accent: #f08a50; --accent-fg: #1b1a18; --accent-soft: #3a2b21; --line: #38342e;
+      --danger: #ff7b72; --danger-fg: #1b1a18;
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #1b1a18; --card: #252320; --fg: #f1ece4; --muted: #a49c90;
     --accent: #f08a50; --accent-fg: #1b1a18; --accent-soft: #3a2b21; --line: #38342e;
+      --danger: #ff7b72; --danger-fg: #1b1a18;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
@@ -59,12 +62,12 @@
     padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer; margin-top: 12px;
   }
   button.link { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; padding: 4px 6px; }
-  button.link.danger { color: var(--muted); }
+  button.link.danger { color: var(--danger); }
   .recipe-head h2 { font-size: 1.1rem; margin: 0; overflow-wrap: anywhere; }
   .actions { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 8px; }
   .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; padding: 10px; border-radius: 8px; background: var(--accent-soft); }
   .confirm span { flex: 1 1 100%; font-weight: 600; }
-  .confirm .yes { background: var(--accent); color: var(--accent-fg); border-radius: 8px; padding: 6px 12px; font-weight: 600; }
+  .confirm .yes { background: var(--danger); color: var(--danger-fg); border-radius: 8px; padding: 6px 12px; font-weight: 600; }
   ul.plain { list-style: none; padding: 0; margin: 8px 0 0; }
   ul.plain li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
   ul.plain li:first-child { border-top: 0; }
@@ -110,7 +113,7 @@
     </form>
     <div class="card" id="list-card"></div>
     <div class="actions">
-      <button class="link" id="clear-done">Clear ticked</button>
+      <button class="link danger" id="clear-done">Clear ticked</button>
       <button class="link danger" id="clear-all">Clear all</button>
       <button class="link" id="copy-list">Copy list</button>
     </div>
@@ -233,7 +236,7 @@ function render() {
       </div>` : `
       <div class="actions">
         <button class="link" data-act="add-all">Add all to shopping list</button>
-        ${list.some(i => r.title in i.src) ? '<button class="link" data-act="remove-all">Remove from shopping list</button>' : ''}
+        ${list.some(i => r.title in i.src) ? '<button class="link danger" data-act="remove-all">Remove from shopping list</button>' : ''}
         <button class="link" data-act="edit">Edit</button>
         <button class="link danger" data-act="delete">Delete</button>
       </div>`}
